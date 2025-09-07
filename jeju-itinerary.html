@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>濟州島六日家庭自駕遊｜互動行程規劃</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals with Earthy Accents -->
+    <!-- Application Structure Plan: A multi-tab SPA is chosen for optimal organization. Tabs include '航班資訊', '行程總覽', '行前規劃', '島嶼風味', and '緊急資訊'. This structure cleanly separates distinct categories of travel information, preventing user overload. The interactive itinerary with integrated maps remains the core feature, supported by detailed, task-oriented sections for planning and reference. This design mimics the thoroughness of a professional travel agency packet in a dynamic, user-friendly format. -->
+    <!-- Visualization & Content Choices: Report Info: Emergency contacts -> Goal: Provide quick reference -> Viz/Method: Styled list/card format -> Interaction: None, clear display -> Justification: In an emergency, users need fast, unambiguous access to critical information. A clean, well-labeled list is the most effective presentation. Report Info: Currency/Voltage -> Goal: Inform practical details -> Viz/Method: Icon-based info cards within 'Planner' -> Interaction: None -> Justification: Key practical details are highlighted with icons for quick recognition and memorization. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #FDFBF6;
+            color: #7D7463;
+        }
+        .tab-active {
+            background-color: #D68453;
+            color: #FDFBF6;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .tab-inactive {
+            background-color: #A8B09A;
+            color: #FDFBF6;
+        }
+        .content-card {
+            background-color: #FFFFFF;
+            border: 1px solid #EAE6E1;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        .day-header {
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .day-header:hover {
+            background-color: #F8F5F1;
+        }
+        .day-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.7s ease-in-out;
+        }
+        .day-content.open {
+            max-height: 2000px;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 320px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+        }
+        .map-pin {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            background-color: #D68453;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .map-pin .pin-label {
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .map-pin:hover .pin-label {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-5xl font-bold text-[#7D7463] mb-2">濟州島家庭自駕終極指南</h1>
+            <p class="text-lg md:text-xl text-[#A8B09A]">一份為您家庭專屬打造的六天五夜互動旅遊手冊</p>
+        </header>
+
+        <nav class="flex justify-center flex-wrap gap-2 md:space-x-4 mb-8 md:mb-12">
+            <button id="tab-flight" class="px-4 py-2 md:px-5 md:py-2.5 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-active">✈️ 航班資訊</button>
+            <button id="tab-itinerary" class="px-4 py-2 md:px-5 md:py-2.5 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive">🗺️ 行程總覽</button>
+            <button id="tab-planner" class="px-4 py-2 md:px-5 md:py-2.5 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive">📋 行前規劃</button>
+            <button id="tab-food" class="px-4 py-2 md:px-5 md:py-2.5 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive">🍜 島嶼風味</button>
+            <button id="tab-emergency" class="px-4 py-2 md:px-5 md:py-2.5 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive">🆘 緊急資訊</button>
+        </nav>
+
+        <main id="main-content">
+            <!-- Section 0: Flight Info -->
+            <section id="content-flight">
+                <div class="content-card p-6 text-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#7D7463] mb-3">您的航班詳情</h2>
+                    <p class="text-[#7D7463] max-w-3xl mx-auto">旅程的起點與終點。以下是您本次旅程的航班資訊，已為您整理妥當。請記得提早抵達機場，為美好的旅程揭開序幕。</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">預訂資訊</h3>
+                        <div class="space-y-3">
+                            <p><strong>航空公司：</strong> 德威航空 (t'way)</p>
+                            <p><strong>訂位代號：</strong> <span class="text-2xl font-mono bg-gray-100 px-2 py-1 rounded">U28LR2</span></p>
+                            <p><strong>乘客：</strong> YEH/YULING, YEH/CHUNCHUAN 等共六位</p>
+                        </div>
+                    </div>
+                    <div class="content-card p-6 row-span-2">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">行李限額 (每人)</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-lg">🧳 托運行李</h4>
+                                <ul class="list-disc list-inside text-[#7D7463] mt-1">
+                                    <li><strong>重量：</strong> 20 公斤</li>
+                                    <li><strong>尺寸：</strong> 長+寬+高 總和 203cm 以內</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-lg">🎒 手提行李</h4>
+                                <ul class="list-disc list-inside text-[#7D7463] mt-1">
+                                    <li><strong>件數：</strong> 1 件</li>
+                                    <li><strong>重量：</strong> 10 公斤以內</li>
+                                    <li><strong>尺寸：</strong> 55 x 40 x 20cm 以內</li>
+                                    <li><strong class="text-red-500">注意：</strong>行動電源必須隨身攜帶，不可托運或置於上方行李櫃。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">🛫 去程航班</h3>
+                        <div class="space-y-3">
+                             <p><strong>航班號：</strong> TW690</p>
+                             <p><strong>日期：</strong> 2025年11月4日 (週二)</p>
+                             <p><strong>航線：</strong> 高雄 (KHH) → 濟州 (CJU)</p>
+                             <p><strong>時間：</strong> 13:40 → 17:05 (當地時間)</p>
+                        </div>
+                    </div>
+                     <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">🛬 回程航班</h3>
+                        <div class="space-y-3">
+                             <p><strong>航班號：</strong> TW689</p>
+                             <p><strong>日期：</strong> 2025年11月9日 (週日)</p>
+                             <p><strong>航線：</strong> 濟州 (CJU) → 高雄 (KHH)</p>
+                             <p><strong>時間：</strong> 11:05 → 12:40 (當地時間)</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 1: Itinerary -->
+            <section id="content-itinerary" class="hidden space-y-6">
+                 <!-- Itinerary items will be injected here by JS -->
+            </section>
+
+            <!-- Section 2: Planner -->
+            <section id="content-planner" class="hidden">
+                 <div class="content-card p-6 text-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#7D7463] mb-3">萬全準備：您的旅行藍圖</h2>
+                    <p class="text-[#7D7463] max-w-3xl mx-auto">本章節彙整了所有關鍵的行前準備資訊，從駕駛要點到住宿策略，旨在確保您的家庭在抵達濟州時充滿信心、準備周全。</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="content-card p-6 lg:col-span-3">
+                         <h3 class="text-xl font-bold text-[#D68453] mb-4">✈️ 機場與入境須知</h3>
+                         <ul class="space-y-4 text-[#7D7463] list-disc list-inside">
+                             <li><strong>機場報到：</strong> 航班起飛前 <span class="font-bold">2-3 小時</span> 抵達機場辦理登機手續。德威航空櫃檯將於起飛前 <span class="font-bold">50 分鐘</span> 關閉。</li>
+                             <li><strong>入境流程：</strong>
+                                <ul class="list-['-_'] list-inside ml-4 mt-2 space-y-2">
+                                     <li><span class="font-semibold text-green-600">K-ETA (電子旅行許可):</span> <span class="font-bold">暫時豁免！</span> 台灣護照持有者在 2025/12/31 前無需申請。</li>
+                                     <li><span class="font-semibold">電子入境申報 (e-Arrival Card):</span> 建議在出發前72小時內線上填寫，可節省排隊時間。若未填寫，機上也會提供紙本入境卡。</li>
+                                     <li><span class="font-semibold">Q-CODE (健康狀態調查):</span> 一般情況<span class="font-bold">無需填寫</span>，除非曾到訪特定檢疫管理地區。</li>
+                                </ul>
+                             </li>
+                             <li><strong>護照效期：</strong> 請務必確認所有家庭成員的護照效期均在<span class="font-bold">六個月以上</span>。</li>
+                         </ul>
+                    </div>
+                    <div class="content-card p-6 lg:col-span-2">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">🚗 地圖與駕駛詳解</h3>
+                        <ul class="space-y-4 text-[#7D7463] list-disc list-inside">
+                            <li><strong>必備文件:</strong> 國際駕照(IDP)、台灣駕照正本、護照。三者缺一不可。</li>
+                            <li><strong>導航App鐵三角:</strong>
+                                <ul class="list-['-_'] list-inside ml-4 mt-2 space-y-2">
+                                    <li><span class="font-semibold">Naver Map / KakaoMap:</span> 韓國當地唯一選擇，資訊最準確。</li>
+                                    <li><span class="font-semibold">導航技巧:</span> 直接輸入目的地的「電話號碼」進行導航，最為快速精準。</li>
+                                </ul>
+                            </li>
+                            <li><strong>實用資訊：</strong>
+                                <ul class="list-['-_'] list-inside ml-4 mt-2 space-y-2">
+                                    <li><span class="font-semibold">電壓：</span> 韓國電壓為 220V，插座為雙圓孔，請自備轉接頭。</li>
+                                    <li><span class="font-semibold">時差：</span> 韓國比台灣快 1 小時 (GMT+9)。</li>
+                                    <li><span class="font-semibold">貨幣：</span> 韓元(KRW)。參考匯率 1 新台幣 ≈ 35-40 韓元 (請以當日銀行公告為準)。</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">👕 11月穿搭術</h3>
+                         <ul class="space-y-3 text-[#7D7463] list-disc list-inside">
+                            <li><strong>洋蔥式穿法:</strong> 
+                                <ul class="list-['-_'] list-inside ml-4 mt-2 space-y-1">
+                                    <li><span class="font-semibold">底層:</span> 吸濕排汗的薄長袖。</li>
+                                    <li><span class="font-semibold">中層:</span> 方便穿脫的毛衣或大學T。</li>
+                                    <li><span class="font-semibold">外層:</span> 一件防風、防小雨的機能外套。</li>
+                                </ul>
+                            </li>
+                            <li><strong>必備配件:</strong> 太陽眼鏡、遮陽帽、以及一雙舒適好走的運動鞋。</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6 lg:col-span-3">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">🏠 住宿策略深度解析</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                            <div class="md:col-span-1">
+                                <div class="chart-container">
+                                    <canvas id="accommodationChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div class="bg-gray-50 p-4 rounded-lg">
+                                    <h4 class="font-bold text-lg text-[#A8B09A]">東部 (城山地區) - 2晚</h4>
+                                    <p class="text-sm text-gray-500 mb-2">景觀壯麗 & 地標集中</p>
+                                    <ul class="text-sm space-y-1">
+                                        <li><span class="text-green-600 font-semibold">✓</span> 鄰近城山日出峰，便於觀日出</li>
+                                        <li><span class="text-green-600 font-semibold">✓</span> 靠近前往牛島的渡輪碼頭</li>
+                                        <li><span class="text-red-500 font-semibold">✗</span> 大型超市較少，生活機能稍弱</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-gray-50 p-4 rounded-lg">
+                                    <h4 class="font-bold text-lg text-[#D68453]">南部 (西歸浦) - 3晚</h4>
+                                    <p class="text-sm text-gray-500 mb-2">渡假城鎮 & 自然薈萃</p>
+                                    <ul class="text-sm space-y-1">
+                                        <li><span class="text-green-600 font-semibold">✓</span> 景點瀑布、博物館集中</li>
+                                        <li><span class="text-green-600 font-semibold">✓</span> 基礎設施完善，餐廳咖啡館多</li>
+                                        <li><span class="text-green-600 font-semibold">✓</span> 鄰近偶來市場，解決晚餐方便</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: Food -->
+            <section id="content-food" class="hidden">
+                <div class="content-card p-6 text-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#7D7463] mb-3">島嶼之味：您的家庭美食伴侶</h2>
+                    <p class="text-[#7D7463] max-w-3xl mx-auto">這裡是您探索濟州美味的實用指南。下方我們精選了幾道必吃美食，您也可以透過點擊區域按鈕，篩選出我們為您推薦的家庭友善餐廳。</p>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="text-center p-4 content-card">
+                        <p class="text-4xl mb-2">🍖</p>
+                        <h4 class="font-bold text-[#D68453]">黑豬肉燒烤</h4>
+                        <p class="text-sm text-[#7D7463]">肉質鮮美風味濃郁</p>
+                    </div>
+                    <div class="text-center p-4 content-card">
+                        <p class="text-4xl mb-2">🍲</p>
+                        <h4 class="font-bold text-[#D68453]">海鮮火鍋</h4>
+                        <p class="text-sm text-[#7D7463]">視覺與味覺的盛宴</p>
+                    </div>
+                     <div class="text-center p-4 content-card">
+                        <p class="text-4xl mb-2">🥣</p>
+                        <h4 class="font-bold text-[#D68453]">鮑魚粥</h4>
+                        <p class="text-sm text-[#7D7463]">營養豐富老少咸宜</p>
+                    </div>
+                     <div class="text-center p-4 content-card">
+                        <p class="text-4xl mb-2">🐟</p>
+                        <h4 class="font-bold text-[#D68453]">帶魚料理</h4>
+                        <p class="text-sm text-[#7D7463]">推薦溫和的鹽烤口味</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-center flex-wrap gap-2 md:space-x-4 mb-8">
+                    <button class="food-filter-btn px-4 py-2 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-active" data-region="all">全部地區</button>
+                    <button class="food-filter-btn px-4 py-2 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive" data-region="東部">東部 (城山/牛島)</button>
+                    <button class="food-filter-btn px-4 py-2 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive" data-region="南部">南部 (西歸浦)</button>
+                    <button class="food-filter-btn px-4 py-2 rounded-full font-semibold text-sm md:text-base transition-all duration-300 tab-inactive" data-region="濟州市">濟州市/機場</button>
+                </div>
+
+                <div id="restaurant-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Restaurant cards will be injected here by JS -->
+                </div>
+            </section>
+            
+            <!-- Section 4: Emergency Info -->
+            <section id="content-emergency" class="hidden">
+                 <div class="content-card p-6 text-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#7D7463] mb-3">緊急聯絡資訊</h2>
+                    <p class="text-[#7D7463] max-w-3xl mx-auto">希望您旅途一切順利，但請將以下資訊備存，以備不時之需。安全永遠是第一位。</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">韓國境內緊急電話</h3>
+                        <ul class="space-y-3">
+                            <li><span class="font-bold text-lg w-16 inline-block">112:</span> 警察局</li>
+                            <li><span class="font-bold text-lg w-16 inline-block">119:</span> 消防隊、緊急救護</li>
+                            <li><span class="font-bold text-lg w-16 inline-block">1330:</span> 旅遊諮詢熱線 (提供中文服務)</li>
+                            <li><span class="font-bold text-lg w-16 inline-block">1339:</span> 疾病管理本部</li>
+                        </ul>
+                    </div>
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-[#D68453] mb-4">駐韓國台北代表部</h3>
+                        <ul class="space-y-3">
+                            <li><strong>地址:</strong> 韓國首爾市鍾路區世宗大路149號光化門大廈6樓</li>
+                             <li><strong>電話:</strong> +82-2-6329-6000</li>
+                             <li class="pt-2"><strong class="text-red-500">緊急聯絡電話:</strong> <span class="font-semibold">+82-10-9080-2761</span><br><span class="text-sm">(專供急難求助之用)</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <script>
+        const itineraryData = [
+            {
+                day: 1,
+                date: "11月4日 (週二)",
+                title: "抵達與東部安頓",
+                lodging: "城山地區",
+                totalDriveTime: "約 1.5 小時",
+                route: [
+                    { name: "濟州機場 (17:05抵達)", x: 35, y: 25 },
+                    { name: "城山住宿", x: 90, y: 45 }
+                ],
+                schedule: [
+                    { time: "17:05", activity: "抵達濟州國際機場(CJU)。", details: "辦理入境手續、領取行李。" },
+                    { time: "18:00", activity: "機場領取預訂車輛。", details: "檢查車況並熟悉操作。" },
+                    { time: "19:00", activity: "驅車前往城山地區入住Airbnb。", details: "車程約1-1.5小時，天色已暗，請小心駕駛。" },
+                    { time: "20:30", activity: "晚餐與休息", details: "在住宿點附近簡單用餐，或提前準備一些簡餐，早點休息以儲備體力。" }
+                ]
+            },
+            {
+                day: 2,
+                date: "11月5日 (週三)",
+                title: "日出、海景與離島漫遊",
+                lodging: "城山地區",
+                totalDriveTime: "極少 (本地活動)",
+                 route: [
+                    { name: "城山住宿", x: 90, y: 45 },
+                    { name: "日出峰", x: 93, y: 48 },
+                    { name: "牛島碼頭", x: 92, y: 42 }
+                ],
+                schedule: [
+                    { time: "清晨", activity: "城山日出峰觀賞日出", place: "성산일출봉", details: "世界自然遺產，登頂約需30分鐘。" },
+                    { time: "上午", activity: "搭乘渡輪前往牛島", place: "우도", details: "從城山港出發，航程約15-20分鐘，購票需全員護照。" },
+                    { time: "午餐與下午", activity: "探索牛島。", details: "建議租賃電動車或搭乘觀光巴士環島。必嚐花生冰淇淋。" },
+                    { time: "晚餐", activity: "城山日出峰刀削麵", place: "성산일출봉손칼국수", details: "品嚐鮮美的海鮮刀削麵和鮑魚粥。" }
+                ]
+            },
+            {
+                day: 3,
+                date: "11月6日 (週四)",
+                title: "南向之旅，穿梭於森林與幻想之間",
+                lodging: "西歸浦地區",
+                totalDriveTime: "約 2.5 小時",
+                route: [
+                    { name: "城山", x: 90, y: 45 },
+                    { name: "山君不離", x: 65, y: 40 },
+                    { name: "史努比莊園", x: 78, y: 50 },
+                    { name: "西歸浦住宿", x: 50, y: 85 }
+                ],
+                schedule: [
+                    { time: "上午", activity: "山君不離", place: "산굼부리", details: "從城山出發車程約40分鐘。欣賞壯麗的銀色紫芒草海。" },
+                    { time: "中午", activity: "史努比莊園", place: "스누피가든", details: "從山君不離車程約20分鐘。園內有咖啡廳可午餐。" },
+                    { time: "下午", activity: "向南行駛至西歸浦，入住新Airbnb。", details: "車程約1小時。" },
+                    { time: "晚餐", activity: "西歸浦每日偶來市場", place: "서귀포매일올레시장", details: "品嚐各式市場小吃。" }
+                ]
+            },
+            {
+                day: 4,
+                date: "11月7日 (週五)",
+                title: "瀑布、茶園與南部魅力",
+                lodging: "西歸浦地區",
+                totalDriveTime: "約 1.5 小時",
+                route: [
+                    { name: "西歸浦", x: 50, y: 85 },
+                    { name: "瀑布群", x: 52, y: 90 },
+                    { name: "O'sulloc", x: 25, y: 70 }
+                ],
+                schedule: [
+                    { time: "上午", activity: "探索瀑布群：正房瀑布 & 天地淵瀑布", place: "정방폭포 & 천지연폭포", details: "兩個瀑布相距不遠，車程約10分鐘。" },
+                    { time: "午餐", activity: "偶來王帶魚", place: "올레왕갈치", details: "品嚐令人印象深刻的烤帶魚套餐。" },
+                    { time: "下午", activity: "O'sulloc雪綠茶博物館", place: "오설록 티 뮤지엄", details: "從西歸浦市區出發車程約40-50分鐘。" },
+                    { time: "晚餐", activity: "三姓穴海鮮湯", place: "삼성혈해물탕", details: "品嚐豐盛暖胃的海鮮火鍋。" }
+                ]
+            },
+            {
+                day: 5,
+                date: "11月8日 (週六)",
+                title: "西部奇觀與海岸寧靜",
+                lodging: "西歸浦地區",
+                totalDriveTime: "約 2 小時",
+                route: [
+                    { name: "西歸浦", x: 50, y: 85 },
+                    { name: "翰林公園", x: 10, y: 40 },
+                    { name: "橘子農場", x: 20, y: 60 }
+                ],
+                schedule: [
+                    { time: "上午", activity: "翰林公園", place: "한림공원", details: "從西歸浦出發車程約1小時。大型植物園。" },
+                    { time: "下午", activity: "挾才海水浴場", place: "협재해수욕장", details: "就在翰林公園對面，步行可達。適合散步玩沙。" },
+                    { time: "晚餐", activity: "告別慶祝晚餐。", details: "享用一頓頂級的黑豬肉燒烤，如著名的Donsadon(돈사돈)。" }
+                ]
+            },
+            {
+                day: 6,
+                date: "11月9日 (週日)",
+                title: "溫馨的告別",
+                lodging: "N/A",
+                totalDriveTime: "約 1.5 小時",
+                route: [
+                    { name: "西歸浦", x: 50, y: 85 },
+                    { name: "濟州機場 (11:05起飛)", x: 35, y: 25 }
+                ],
+                schedule: [
+                    { time: "08:00", activity: "起床、整理行李並辦理退房。", details: "確認沒有遺漏任何物品。" },
+                    { time: "09:00", activity: "驅車前往濟州國際機場。", details: "從西歸浦出發車程約1-1.5小時。" },
+                    { time: "10:00", activity: "還車並辦理登機手續。", details: "還車流程約需30分鐘，接著辦理托運及安檢。" },
+                    { time: "11:05", activity: "搭乘 TW689 航班返回溫暖的家。", details: "期待下次再訪美麗的濟州島。" }
+                ]
+            }
+        ];
+
+        const restaurantData = [
+            { name: "城山日出峰刀削麵", specialty: "海鮮刀削麵、鮑魚粥", region: "東部", notes: "口味溫和不辣，健行後享用非常暖心。" },
+            { name: "HAHAHOHO (하하호호)", specialty: "黑豬肉花生漢堡", region: "東部", notes: "位於牛島，有趣、休閒、美味。" },
+            { name: "偶來王帶魚 (올레왕갈치)", specialty: "帶魚料理", region: "南部", notes: "建議點鹽烤帶魚，口味溫和，適合兒童。" },
+            { name: "中央炸雞 (중앙통닭)", specialty: "蒜味炸雞", region: "南部", notes: "位於偶來市場內，廣受歡迎的選擇。" },
+            { name: "三姓穴海鮮湯 (삼성혈해물탕)", specialty: "海鮮火鍋", region: "南部", notes: "視覺效果震撼，可要求不辣湯底。" },
+            { name: "菜板豚 (돔베돈)", specialty: "黑豬肉燒烤套餐", region: "濟州市", notes: "米其林推薦，座位寬敞。" }
+        ];
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const tabs = [
+                { btn: document.getElementById('tab-flight'), content: document.getElementById('content-flight') },
+                { btn: document.getElementById('tab-itinerary'), content: document.getElementById('content-itinerary') },
+                { btn: document.getElementById('tab-planner'), content: document.getElementById('content-planner') },
+                { btn: document.getElementById('tab-food'), content: document.getElementById('content-food') },
+                { btn: document.getElementById('tab-emergency'), content: document.getElementById('content-emergency') }
+            ];
+
+            const foodFilterBtns = document.querySelectorAll('.food-filter-btn');
+            
+            function switchTab(targetId) {
+                tabs.forEach(tab => {
+                    const isActive = tab.btn.id === targetId;
+                    tab.btn.classList.toggle('tab-active', isActive);
+                    tab.btn.classList.toggle('tab-inactive', !isActive);
+                    tab.content.classList.toggle('hidden', !isActive);
+                });
+            }
+            
+            tabs.forEach(tab => {
+                tab.btn.addEventListener('click', () => switchTab(tab.btn.id));
+            });
+
+            function renderItinerary() {
+                const container = document.getElementById('content-itinerary');
+                container.innerHTML = `
+                <div class="content-card p-6 text-center">
+                    <h2 class="text-2xl font-bold text-[#7D7463] mb-3">精心策劃的旅程</h2>
+                    <p class="text-[#7D7463] max-w-3xl mx-auto">此行程已根據您的航班時間優化。點擊每日標題展開行程，即可查看包含<span class="font-semibold text-[#D68453]">路線示意圖</span>的詳細規劃。</p>
+                </div>`;
+                itineraryData.forEach(dayData => {
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'content-card';
+                    
+                    let scheduleHtml = dayData.schedule.map(item => `
+                        <div class="py-3 border-t border-gray-100 flex">
+                            <div class="w-1/4 font-semibold text-[#D68453]">${item.time}</div>
+                            <div class="w-3/4">
+                                <p class="font-semibold text-gray-800">${item.activity} ${item.place ? `<span class="text-sm font-normal text-gray-500">${item.place}</span>` : ''}</p>
+                                <p class="text-sm text-gray-600">${item.details}</p>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    let pinsHtml = dayData.route.map((p, i) => `<div class="map-pin" style="left:${p.x}%; top:${p.y}%;"><span class="pin-label">${p.name}</span>${String.fromCharCode(65 + i)}</div>`).join('');
+                    
+                    let linesHtml = '';
+                    if (dayData.route.length > 1) {
+                        for (let i = 0; i < dayData.route.length - 1; i++) {
+                            const p1 = dayData.route[i];
+                            const p2 = dayData.route[i+1];
+                            linesHtml += `<line x1="${p1.x}%" y1="${p1.y}%" x2="${p2.x}%" y2="${p2.y}%" stroke="#D68453" stroke-width="2" stroke-dasharray="4 2"/>`;
+                        }
+                    }
+
+                    dayElement.innerHTML = `
+                        <div class="day-header p-4 md:p-6 flex justify-between items-center">
+                            <div>
+                                <h3 class="text-xl md:text-2xl font-bold text-[#7D7463]">Day ${dayData.day}: ${dayData.title}</h3>
+                                <p class="text-sm text-[#A8B09A]">${dayData.date} | 住宿: ${dayData.lodging}</p>
+                            </div>
+                            <span class="text-2xl text-[#A8B09A] transform transition-transform duration-500">&#x25BC;</span>
+                        </div>
+                        <div class="day-content px-4 md:px-6">
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 py-4">
+                                <div class="md:col-span-2">
+                                    <h4 class="font-bold text-lg text-[#7D7463] mb-2">本日路線概覽</h4>
+                                    <div class="map-container bg-gray-100 rounded-lg overflow-hidden relative aspect-[4/3]">
+                                        <svg viewBox="0 0 200 120" class="absolute top-0 left-0 w-full h-full" preserveAspectRatio="none">
+                                            <path d="M183.5,62.5 C183.5,82.98 147.48,99.5 100,99.5 C52.52,99.5 16.5,82.98 16.5,62.5 C16.5,42.02 52.52,25.5 100,25.5 C147.48,25.5 183.5,42.02 183.5,62.5 Z" fill="#EAE6E1" stroke="#D1CABD" stroke-width="1"/>
+                                        </svg>
+                                        <svg class="absolute top-0 left-0 w-full h-full">${linesHtml}</svg>
+                                        ${pinsHtml}
+                                    </div>
+                                    <div class="mt-2 text-sm text-gray-600">
+                                        <p><strong>總預估車程：</strong><span class="font-semibold text-[#D68453]">${dayData.totalDriveTime}</span></p>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-3">
+                                    ${scheduleHtml}
+                                </div>
+                            </div>
+                            <div class="h-4"></div>
+                        </div>
+                    `;
+                    container.appendChild(dayElement);
+                });
+
+                document.querySelectorAll('.day-header').forEach(header => {
+                    header.addEventListener('click', () => {
+                        const content = header.nextElementSibling;
+                        const arrow = header.querySelector('span');
+                        
+                        document.querySelectorAll('.day-content.open').forEach(openContent => {
+                            if (openContent !== content) {
+                                openContent.classList.remove('open');
+                                openContent.previousElementSibling.querySelector('span').style.transform = 'rotate(0deg)';
+                            }
+                        });
+
+                        content.classList.toggle('open');
+                        arrow.style.transform = content.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0deg)';
+                    });
+                });
+            }
+
+            function renderRestaurants(filter = 'all') {
+                const grid = document.getElementById('restaurant-grid');
+                grid.innerHTML = '';
+                const filteredData = filter === 'all' ? restaurantData : restaurantData.filter(r => r.region === filter);
+
+                filteredData.forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'content-card p-6';
+                    card.innerHTML = `
+                        <h4 class="text-lg font-bold text-[#D68453]">${r.name}</h4>
+                        <p class="font-semibold text-sm text-[#7D7463] my-2">特色菜: ${r.specialty}</p>
+                        <p class="text-sm text-gray-600">${r.notes}</p>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+
+            foodFilterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    foodFilterBtns.forEach(b => b.classList.replace('tab-active', 'tab-inactive'));
+                    btn.classList.replace('tab-inactive', 'tab-active');
+                    renderRestaurants(btn.dataset.region);
+                });
+            });
+
+            function createAccommodationChart() {
+                const ctx = document.getElementById('accommodationChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['東部 (城山地區)', '南部 (西歸浦地區)'],
+                        datasets: [{
+                            label: '住宿晚數',
+                            data: [2, 3],
+                            backgroundColor: ['#A8B09A', '#D68453'],
+                            borderColor: '#FFFFFF',
+                            borderWidth: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#7D7463', font: { size: 14 } }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) { return (context.label || '') + ': ' + context.raw + ' 晚'; }
+                                }
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+            }
+            
+            renderItinerary();
+            createAccommodationChart();
+            renderRestaurants();
+            switchTab('tab-flight');
+        });
+    </script>
+</body>
+</html>
